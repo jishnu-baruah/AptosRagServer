@@ -4,7 +4,23 @@
 
 A simple Retrieval-Augmented Generation (RAG) server for managing and querying a knowledge base of Aptos documentation and DeFi snippets. Features a FastAPI backend and a web UI for snippet management.
 
-## Quick Setup
+---
+
+## Project Structure: Lightweight Query Server & Heavy Update Server
+
+- **Main Server (rag_server.py + requirements.txt):**
+  - Lightweight, fast, and suitable for cloud deployment (e.g., Render free tier).
+  - Only supports querying and retrieval (RAG) endpoints.
+  - No heavy dependencies or embedding logic.
+
+- **Update/Embedding Server (server2.py + requirements2.txt):**
+  - Contains all heavy logic for updating, embedding, chunking, and uploading to Pinecone.
+  - Use this server only when you need to update or manage the knowledge base.
+  - Not intended for lightweight or always-on deployment.
+
+---
+
+## Quick Setup (Query Server Only)
 
 1. **Clone the repository:**
    ```bash
@@ -28,6 +44,24 @@ A simple Retrieval-Augmented Generation (RAG) server for managing and querying a
 
 5. **Access the web UI:**
    Open your browser and go to [http://localhost:8000](http://localhost:8000) to manage and query snippets.
+
+---
+
+## Using the Update/Embedding Server
+
+If you need to add, edit, or delete snippets, or update embeddings:
+
+1. **Install heavy dependencies:**
+   ```bash
+   uv pip install -r requirements2.txt
+   ```
+2. **Run the update server:**
+   ```bash
+   uvicorn server2:app --reload
+   ```
+3. **Use the endpoints in server2.py to update the knowledge base.**
+
+> **Note:** Only run server2.py and install requirements2.txt when you need to update or manage the knowledge base. For normal usage and deployment, use only the main server and requirements.txt.
 
 ---
 
