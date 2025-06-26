@@ -2,8 +2,8 @@ services:
   - type: web
     name: aptos-rag-server
     env: python
-    buildCommand: uv pip install -r requirements.txt
-    startCommand: uv run uvicorn rag_server:app --host 0.0.0.0 --port 8000
+    buildCommand: pip install uv && uv pip install -r requirements.txt
+    startCommand: uvicorn rag_server:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PINECONE_API_KEY
         sync: false
