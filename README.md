@@ -1,12 +1,14 @@
 # Aptos RAG Server
 
+[GitHub Repository](https://github.com/jishnu-baruah/AptosRagServer)
+
 A simple Retrieval-Augmented Generation (RAG) server for managing and querying a knowledge base of Aptos documentation and DeFi snippets. Features a FastAPI backend and a web UI for snippet management.
 
 ## Quick Setup
 
 1. **Clone the repository:**
    ```bash
-   git clone <your-repo-url>
+   git clone https://github.com/jishnu-baruah/AptosRagServer
    cd aptos.dev
    ```
 
