@@ -8,7 +8,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from pinecone import Pinecone
-from sentence_transformers import SentenceTransformer
 
 load_dotenv()
 
@@ -23,13 +22,11 @@ app.add_middleware(
 
 API_KEY = os.environ["PINECONE_API_KEY"]
 INDEX_NAME = "aptos-whitepaper"
-MODEL_NAME = "BAAI/bge-base-en-v1.5"
 USER_IDS_FILE = "user_snippet_ids.json"
 
 pc = Pinecone(api_key=API_KEY)
 desc = pc.describe_index(INDEX_NAME)
 index = pc.Index(host=desc.host)
-model = SentenceTransformer(MODEL_NAME)
 
 # Helper to store user snippet IDs for listing/deletion
 if not os.path.exists(USER_IDS_FILE):
@@ -55,7 +52,8 @@ def get_user_ids():
         return json.load(f)
 
 class QueryRequest(BaseModel):
-    question: str
+    embedding: list
+    top_k: int = 3
 
 class AddSnippetRequest(BaseModel):
     text: str
@@ -233,8 +231,7 @@ def add_snippet(req: AddSnippetRequest):
     try:
         snippet_id = f"user-{uuid.uuid4()}"
         now = datetime.utcnow().isoformat()
-        embedding = model.encode([req.text], normalize_embeddings=True)[0].tolist()
-        index.upsert(vectors=[(snippet_id, embedding, {"text": req.text, "section": req.section, "date": now})])
+        index.upsert(vectors=[(snippet_id, req.embedding, {"text": req.text, "section": req.section, "date": now})])
         add_user_id(snippet_id)
         return {"status": "success", "id": snippet_id}
     except Exception as e:
@@ -244,8 +241,7 @@ def add_snippet(req: AddSnippetRequest):
 def edit_snippet(req: EditSnippetRequest):
     try:
         now = datetime.utcnow().isoformat()
-        embedding = model.encode([req.text], normalize_embeddings=True)[0].tolist()
-        index.upsert(vectors=[(req.id, embedding, {"text": req.text, "section": req.section, "date": now})])
+        index.upsert(vectors=[(req.id, req.embedding, {"text": req.text, "section": req.section, "date": now})])
         return {"status": "success", "id": req.id}
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": str(e)})
@@ -294,8 +290,7 @@ def download_snippets():
 @app.post("/query")
 def query_rag(req: QueryRequest):
     try:
-        query_emb = model.encode([req.question], normalize_embeddings=True)[0].tolist()
-        results = index.query(vector=query_emb, top_k=3, include_metadata=True)
+        results = index.query(vector=req.embedding, top_k=req.top_k, include_metadata=True)
         matches = [
             {
                 "score": match.score,
