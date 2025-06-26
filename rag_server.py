@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from pinecone import Pinecone
+import requests
 
 load_dotenv()
 
@@ -23,6 +24,11 @@ app.add_middleware(
 API_KEY = os.environ["PINECONE_API_KEY"]
 INDEX_NAME = "aptos-whitepaper"
 USER_IDS_FILE = "user_snippet_ids.json"
+HUGGINGFACE_API_KEY = os.environ["HUGGINGFACE_API_KEY"]
+HUGGINGFACE_API_URL = os.environ.get(
+    "HUGGINGFACE_API_URL",
+    "https://api-inference.huggingface.co/pipeline/feature-extraction/BAAI/bge-base-en-v1.5"
+)
 
 pc = Pinecone(api_key=API_KEY)
 desc = pc.describe_index(INDEX_NAME)
@@ -52,7 +58,7 @@ def get_user_ids():
         return json.load(f)
 
 class QueryRequest(BaseModel):
-    embedding: list
+    question: str
     top_k: int = 3
 
 class AddSnippetRequest(BaseModel):
@@ -287,10 +293,18 @@ def download_snippets():
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": str(e)})
 
+def get_embedding(text: str):
+    headers = {"Authorization": f"Bearer {HUGGINGFACE_API_KEY}"}
+    response = requests.post(HUGGINGFACE_API_URL, headers=headers, json={"inputs": text})
+    response.raise_for_status()
+    embedding = response.json()[0]  # shape: [1, 768]
+    return embedding
+
 @app.post("/query")
 def query_rag(req: QueryRequest):
     try:
-        results = index.query(vector=req.embedding, top_k=req.top_k, include_metadata=True)
+        embedding = get_embedding(req.question)
+        results = index.query(vector=embedding, top_k=req.top_k, include_metadata=True)
         matches = [
             {
                 "score": match.score,
