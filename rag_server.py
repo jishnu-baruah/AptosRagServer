@@ -63,7 +63,7 @@ class QueryRequest(BaseModel):
 
 class AddSnippetRequest(BaseModel):
     text: str
-    section: str
+    section: str = ""
 
 class EditSnippetRequest(BaseModel):
     id: str
@@ -235,21 +235,35 @@ def serve_ui():
 @app.post("/add_snippet")
 def add_snippet(req: AddSnippetRequest):
     try:
+        embedding = client.feature_extraction(req.text, model=MODEL_NAME)
+        if hasattr(embedding, "tolist"):
+            embedding = embedding.tolist()
         snippet_id = f"user-{uuid.uuid4()}"
         now = datetime.utcnow().isoformat()
-        index.upsert(vectors=[(snippet_id, req.embedding, {"text": req.text, "section": req.section, "date": now})])
+        index.upsert(vectors=[(
+            snippet_id,
+            embedding,
+            {"text": req.text, "section": req.section, "date": now}
+        )])
         add_user_id(snippet_id)
         return {"status": "success", "id": snippet_id}
     except Exception as e:
+        print("Error in /add_snippet endpoint:", e)
+        traceback.print_exc()
         return JSONResponse(status_code=500, content={"detail": str(e)})
 
 @app.post("/edit_snippet")
 def edit_snippet(req: EditSnippetRequest):
     try:
+        embedding = client.feature_extraction(req.text, model=MODEL_NAME)
+        if hasattr(embedding, "tolist"):
+            embedding = embedding.tolist()
         now = datetime.utcnow().isoformat()
-        index.upsert(vectors=[(req.id, req.embedding, {"text": req.text, "section": req.section, "date": now})])
+        index.upsert(vectors=[(req.id, embedding, {"text": req.text, "section": req.section, "date": now})])
         return {"status": "success", "id": req.id}
     except Exception as e:
+        print("Error in /edit_snippet endpoint:", e)
+        traceback.print_exc()
         return JSONResponse(status_code=500, content={"detail": str(e)})
 
 @app.post("/delete_snippet")
