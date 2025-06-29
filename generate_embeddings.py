@@ -1,15 +1,27 @@
 import json
-from sentence_transformers import SentenceTransformer
+import os
+import requests
 from tqdm import tqdm
+from dotenv import load_dotenv
+
+load_dotenv()
 
 INPUT_FILE = 'whitepaper_chunks.jsonl'
 OUTPUT_FILE = 'whitepaper_embeddings.jsonl'
-MODEL_NAME = 'BAAI/bge-base-en-v1.5'  # You can change to 'all-MiniLM-L6-v2' if you prefer
+HUGGINGFACE_API_KEY = os.environ["HUGGINGFACE_API_KEY"]
+HUGGINGFACE_API_URL = os.environ.get(
+    "HUGGINGFACE_API_URL",
+    "https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2"
+)
 BATCH_SIZE = 8
 
-# Load model
-print(f"Loading model: {MODEL_NAME}")
-model = SentenceTransformer(MODEL_NAME)
+headers = {"Authorization": f"Bearer {HUGGINGFACE_API_KEY}"}
+
+def get_embeddings(texts):
+    # Hugging Face API supports batching
+    response = requests.post(HUGGINGFACE_API_URL, headers=headers, json={"inputs": texts})
+    response.raise_for_status()
+    return response.json()
 
 # Read all chunks
 chunks = []
@@ -25,8 +37,8 @@ print(f"Generating embeddings for {len(texts)} chunks ...")
 embeddings = []
 for i in tqdm(range(0, len(texts), BATCH_SIZE)):
     batch = texts[i:i+BATCH_SIZE]
-    batch_emb = model.encode(batch, show_progress_bar=False, normalize_embeddings=True)
-    embeddings.extend(batch_emb.tolist())
+    batch_emb = get_embeddings(batch)
+    embeddings.extend(batch_emb)
 
 # Write output
 print(f"Writing embeddings to {OUTPUT_FILE}")

@@ -8,7 +8,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from pinecone import Pinecone
-import requests
+from huggingface_hub import InferenceClient
+import traceback
 
 load_dotenv()
 
@@ -24,15 +25,14 @@ app.add_middleware(
 API_KEY = os.environ["PINECONE_API_KEY"]
 INDEX_NAME = "aptos-whitepaper"
 USER_IDS_FILE = "user_snippet_ids.json"
-HUGGINGFACE_API_KEY = os.environ["HUGGINGFACE_API_KEY"]
-HUGGINGFACE_API_URL = os.environ.get(
-    "HUGGINGFACE_API_URL",
-    "https://api-inference.huggingface.co/pipeline/feature-extraction/BAAI/bge-base-en-v1.5"
-)
+HF_TOKEN = os.environ["HF_TOKEN"]
+MODEL_NAME = "BAAI/bge-base-en-v1.5"
 
 pc = Pinecone(api_key=API_KEY)
 desc = pc.describe_index(INDEX_NAME)
 index = pc.Index(host=desc.host)
+
+client = InferenceClient(provider="hf-inference", api_key=HF_TOKEN)
 
 # Helper to store user snippet IDs for listing/deletion
 if not os.path.exists(USER_IDS_FILE):
@@ -294,16 +294,14 @@ def download_snippets():
         return JSONResponse(status_code=500, content={"detail": str(e)})
 
 def get_embedding(text: str):
-    headers = {"Authorization": f"Bearer {HUGGINGFACE_API_KEY}"}
-    response = requests.post(HUGGINGFACE_API_URL, headers=headers, json={"inputs": text})
-    response.raise_for_status()
-    embedding = response.json()[0]  # shape: [1, 768]
-    return embedding
+    return client.feature_extraction(text, model=MODEL_NAME)
 
 @app.post("/query")
 def query_rag(req: QueryRequest):
     try:
         embedding = get_embedding(req.question)
+        if hasattr(embedding, "tolist"):
+            embedding = embedding.tolist()
         results = index.query(vector=embedding, top_k=req.top_k, include_metadata=True)
         matches = [
             {
@@ -315,4 +313,8 @@ def query_rag(req: QueryRequest):
         ]
         return {"results": matches}
     except Exception as e:
-        return JSONResponse(status_code=500, content={"detail": str(e)}) 
+        print("Error in /query endpoint:", e)
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
+# NOTE: You must re-embed your data with all-MiniLM-L6-v2 (dimension 384) for correct retrieval. 

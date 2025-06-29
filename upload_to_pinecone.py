@@ -11,7 +11,7 @@ print(f".env exists: {os.path.exists('.env')}")
 load_dotenv()
 
 INDEX_NAME = "aptos-whitepaper"
-DIMENSION = 768  # for BAAI/bge-base-en-v1.5
+DIMENSION = 384  # for all-MiniLM-L6-v2
 BATCH_SIZE = 32
 
 try:
