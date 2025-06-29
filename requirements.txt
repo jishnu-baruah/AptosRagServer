@@ -1,4 +1,7 @@
 fastapi
 uvicorn
 pinecone
+huggingface_hub
+python-dotenv
+requests
 dotenv
